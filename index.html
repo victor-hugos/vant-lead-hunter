@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VANT Lead Hunter</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">VANT.Business</p>
+        <h1>Lead Hunter</h1>
+      </div>
+      <div class="topbar-actions">
+        <button id="exportData" type="button">Exportar JSON</button>
+        <label class="file-button">
+          Importar JSON
+          <input id="importData" type="file" accept="application/json" />
+        </label>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <div class="section-title">
+          <h2>Campanha</h2>
+          <p>Defina o nicho, local e oferta. A oferta sempre vem de você.</p>
+        </div>
+
+        <form id="campaignForm" class="form-grid">
+          <label>
+            Nome da campanha
+            <input id="campaignName" required placeholder="Parceria hotel Recife" />
+          </label>
+
+          <label>
+            Nicho
+            <input id="niche" required placeholder="Hotéis e pousadas" />
+          </label>
+
+          <label>
+            Local
+            <input id="location" required placeholder="Recife, PE" />
+          </label>
+
+          <label>
+            Objetivo
+            <input id="goal" required placeholder="Conseguir parceria para 1 diária" />
+          </label>
+
+          <label class="full">
+            Oferta definida por Victor
+            <textarea id="offer" required rows="4" placeholder="Descreva exatamente o que você quer oferecer. A IA/sistema não altera essa oferta."></textarea>
+          </label>
+
+          <label>
+            Remetente de e-mail
+            <input id="senderEmail" required type="email" value="admin@vant.business" />
+          </label>
+
+          <label>
+            Tom da abordagem
+            <select id="tone">
+              <option value="direto e cordial">Direto e cordial</option>
+              <option value="premium e consultivo">Premium e consultivo</option>
+              <option value="leve e pessoal">Leve e pessoal</option>
+              <option value="comercial objetivo">Comercial objetivo</option>
+            </select>
+          </label>
+
+          <label class="full">
+            Critérios de análise
+            <textarea id="criteria" rows="3" placeholder="Ex: Instagram ativo, WhatsApp visível, boa localização, perfil compatível com parceria."></textarea>
+          </label>
+
+          <button type="submit" class="primary">Salvar campanha</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Lead</h2>
+          <p>Cadastre contatos manualmente ou cole dados encontrados em Maps, Instagram ou sites.</p>
+        </div>
+
+        <form id="leadForm" class="form-grid">
+          <label>
+            Nome
+            <input id="leadName" required placeholder="Hotel Exemplo Recife" />
+          </label>
+
+          <label>
+            Categoria
+            <input id="leadCategory" placeholder="Hotel, pousada, clínica..." />
+          </label>
+
+          <label>
+            Bairro/Cidade
+            <input id="leadArea" placeholder="Boa Viagem, Recife" />
+          </label>
+
+          <label>
+            WhatsApp
+            <input id="leadWhatsapp" placeholder="+55 81 99999-9999" />
+          </label>
+
+          <label>
+            E-mail
+            <input id="leadEmail" type="email" placeholder="contato@empresa.com" />
+          </label>
+
+          <label>
+            Instagram
+            <input id="leadInstagram" placeholder="@perfil" />
+          </label>
+
+          <label class="full">
+            Site
+            <input id="leadSite" placeholder="https://..." />
+          </label>
+
+          <label class="full">
+            Observações
+            <textarea id="leadNotes" rows="3" placeholder="O que você percebeu sobre esse lead?"></textarea>
+          </label>
+
+          <button type="submit" class="primary">Adicionar lead</button>
+        </form>
+      </section>
+
+      <section class="panel wide">
+        <div class="section-title">
+          <h2>CRM e mensagens</h2>
+          <p>Selecione um lead para gerar WhatsApp, e-mail e acompanhar o status.</p>
+        </div>
+
+        <div class="crm-layout">
+          <div>
+            <div id="leadList" class="lead-list"></div>
+          </div>
+
+          <aside class="message-box">
+            <div id="selectedEmpty" class="empty-state">Nenhum lead selecionado.</div>
+            <div id="selectedLead" class="hidden">
+              <div class="selected-header">
+                <div>
+                  <p id="selectedCategory" class="eyebrow"></p>
+                  <h3 id="selectedName"></h3>
+                </div>
+                <select id="leadStatus">
+                  <option>Novo</option>
+                  <option>Mensagem preparada</option>
+                  <option>Mensagem enviada</option>
+                  <option>Respondeu</option>
+                  <option>Enviar proposta</option>
+                  <option>Reunião marcada</option>
+                  <option>Fechado</option>
+                  <option>Perdido</option>
+                </select>
+              </div>
+
+              <label>
+                Assunto do e-mail
+                <input id="emailSubject" />
+              </label>
+
+              <label>
+                Mensagem gerada
+                <textarea id="generatedMessage" rows="12"></textarea>
+              </label>
+
+              <p class="email-note">
+                Para enviar como admin@vant.business, selecione essa conta no seu cliente de e-mail antes de enviar.
+              </p>
+
+              <div class="actions">
+                <button id="copySubject" type="button">Copiar assunto</button>
+                <button id="copyMessage" type="button">Copiar mensagem</button>
+                <button id="openMail" type="button">Abrir e-mail</button>
+                <button id="openWhatsapp" type="button">Abrir WhatsApp</button>
+                <button id="markSent" type="button" class="primary">Marcar como enviada</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <template id="leadItemTemplate">
+      <article class="lead-item">
+        <button class="lead-select" type="button">
+          <span class="lead-title"></span>
+          <span class="lead-meta"></span>
+        </button>
+        <span class="status-pill"></span>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
