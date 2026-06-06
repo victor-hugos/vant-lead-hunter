@@ -13,6 +13,7 @@
         <h1>Lead Hunter</h1>
       </div>
       <div class="topbar-actions">
+        <span id="storageStatus" class="storage-status">Modo local</span>
         <button id="exportData" type="button">Exportar JSON</button>
         <label class="file-button">
           Importar JSON
@@ -22,6 +23,28 @@
     </header>
 
     <main class="layout">
+      <section class="panel wide compact-panel">
+        <div class="section-title">
+          <h2>Banco de dados</h2>
+          <p>Informe as chaves publicas do Supabase para salvar online. Sem isso, o app continua funcionando em modo local.</p>
+        </div>
+
+        <form id="databaseForm" class="form-grid">
+          <label>
+            Supabase URL
+            <input id="supabaseUrl" placeholder="https://xxxx.supabase.co" />
+          </label>
+
+          <label>
+            Supabase anon key
+            <input id="supabaseAnonKey" placeholder="eyJ..." />
+          </label>
+
+          <button type="submit" class="primary">Conectar banco</button>
+          <button id="loadDatabase" type="button">Carregar do banco</button>
+        </form>
+      </section>
+
       <section class="panel">
         <div class="section-title">
           <h2>Campanha</h2>

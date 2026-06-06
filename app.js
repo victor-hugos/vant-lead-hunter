@@ -1,7 +1,9 @@
-const STORAGE_KEY = "vantLeadHunter.v1";
+const STORAGE_KEY = "vantLeadHunter.v2";
+const CONFIG_KEY = "vantLeadHunter.supabase";
 
 const initialState = {
   campaign: {
+    id: null,
     name: "Parceria hotel Recife",
     niche: "Hoteis e pousadas",
     location: "Recife, PE",
@@ -17,8 +19,14 @@ const initialState = {
 };
 
 let state = loadState();
+let dbConfig = loadDbConfig();
 
 const elements = {
+  databaseForm: document.querySelector("#databaseForm"),
+  supabaseUrl: document.querySelector("#supabaseUrl"),
+  supabaseAnonKey: document.querySelector("#supabaseAnonKey"),
+  loadDatabase: document.querySelector("#loadDatabase"),
+  storageStatus: document.querySelector("#storageStatus"),
   campaignForm: document.querySelector("#campaignForm"),
   campaignName: document.querySelector("#campaignName"),
   niche: document.querySelector("#niche"),
@@ -57,17 +65,222 @@ const elements = {
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return initialState;
+  if (!saved) return structuredClone(initialState);
 
   try {
-    return { ...initialState, ...JSON.parse(saved) };
+    return { ...structuredClone(initialState), ...JSON.parse(saved) };
   } catch {
-    return initialState;
+    return structuredClone(initialState);
   }
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadDbConfig() {
+  const saved = localStorage.getItem(CONFIG_KEY);
+  if (!saved) return { supabaseUrl: "", supabaseAnonKey: "" };
+
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return { supabaseUrl: "", supabaseAnonKey: "" };
+  }
+}
+
+function saveDbConfig() {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(dbConfig));
+}
+
+function isDatabaseConfigured() {
+  return Boolean(dbConfig.supabaseUrl && dbConfig.supabaseAnonKey);
+}
+
+function updateStorageStatus(message) {
+  const online = isDatabaseConfigured();
+  elements.storageStatus.textContent =
+    message || (online ? "Banco conectado" : "Modo local");
+  elements.storageStatus.classList.toggle("online", online);
+}
+
+function dbHeaders(prefer) {
+  const headers = {
+    apikey: dbConfig.supabaseAnonKey,
+    Authorization: `Bearer ${dbConfig.supabaseAnonKey}`,
+    "Content-Type": "application/json",
+  };
+
+  if (prefer) headers.Prefer = prefer;
+  return headers;
+}
+
+async function dbRequest(path, options = {}) {
+  if (!isDatabaseConfigured()) return null;
+
+  const response = await fetch(`${dbConfig.supabaseUrl}/rest/v1/${path}`, {
+    ...options,
+    headers: { ...dbHeaders(options.prefer), ...(options.headers || {}) },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || `Supabase error ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+function campaignToDb(campaign) {
+  return {
+    name: campaign.name,
+    niche: campaign.niche,
+    location: campaign.location,
+    goal: campaign.goal,
+    offer: campaign.offer,
+    sender_email: campaign.senderEmail,
+    tone: campaign.tone,
+    criteria: campaign.criteria,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function campaignFromDb(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    niche: row.niche,
+    location: row.location,
+    goal: row.goal,
+    offer: row.offer,
+    senderEmail: row.sender_email,
+    tone: row.tone,
+    criteria: row.criteria || "",
+  };
+}
+
+function leadToDb(lead) {
+  return {
+    campaign_id: lead.campaignId || state.campaign.id,
+    name: lead.name,
+    category: lead.category,
+    area: lead.area,
+    whatsapp: lead.whatsapp,
+    email: lead.email,
+    instagram: lead.instagram,
+    site: lead.site,
+    notes: lead.notes,
+    status: lead.status,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function leadFromDb(row) {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    name: row.name,
+    category: row.category || "",
+    area: row.area || "",
+    whatsapp: row.whatsapp || "",
+    email: row.email || "",
+    instagram: row.instagram || "",
+    site: row.site || "",
+    notes: row.notes || "",
+    status: row.status || "Novo",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function loadFromDatabase() {
+  if (!isDatabaseConfigured()) {
+    updateStorageStatus("Configure o banco");
+    return;
+  }
+
+  updateStorageStatus("Carregando...");
+  const campaigns = await dbRequest(
+    "lead_hunter_campaigns?select=*&order=created_at.desc&limit=1",
+  );
+
+  if (!campaigns || campaigns.length === 0) {
+    await saveCampaignToDatabase();
+    updateStorageStatus("Banco conectado");
+    return;
+  }
+
+  state.campaign = campaignFromDb(campaigns[0]);
+  const leads = await dbRequest(
+    `lead_hunter_leads?select=*&campaign_id=eq.${state.campaign.id}&order=created_at.desc`,
+  );
+  state.leads = (leads || []).map(leadFromDb);
+  state.selectedLeadId = state.leads[0]?.id || null;
+  saveState();
+  fillCampaignForm();
+  renderLeads();
+  updateStorageStatus("Banco conectado");
+}
+
+async function saveCampaignToDatabase() {
+  if (!isDatabaseConfigured()) return;
+
+  const payload = campaignToDb(state.campaign);
+
+  if (state.campaign.id) {
+    const rows = await dbRequest(
+      `lead_hunter_campaigns?id=eq.${state.campaign.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+        prefer: "return=representation",
+      },
+    );
+    state.campaign = campaignFromDb(rows[0]);
+    saveState();
+    return;
+  }
+
+  const rows = await dbRequest("lead_hunter_campaigns", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    prefer: "return=representation",
+  });
+  state.campaign = campaignFromDb(rows[0]);
+  saveState();
+}
+
+async function saveLeadToDatabase(lead) {
+  if (!isDatabaseConfigured()) return lead;
+
+  if (!state.campaign.id) await saveCampaignToDatabase();
+
+  const rows = await dbRequest("lead_hunter_leads", {
+    method: "POST",
+    body: JSON.stringify(leadToDb({ ...lead, campaignId: state.campaign.id })),
+    prefer: "return=representation",
+  });
+
+  return leadFromDb(rows[0]);
+}
+
+async function updateLeadStatusInDatabase(lead) {
+  if (!isDatabaseConfigured() || !lead.id) return;
+
+  await dbRequest(`lead_hunter_leads?id=eq.${lead.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      status: lead.status,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+}
+
+function fillDatabaseForm() {
+  elements.supabaseUrl.value = dbConfig.supabaseUrl || "";
+  elements.supabaseAnonKey.value = dbConfig.supabaseAnonKey || "";
+  updateStorageStatus();
 }
 
 function fillCampaignForm() {
@@ -150,11 +363,12 @@ function buildEmailSubject(lead) {
 
 function buildMessage(lead) {
   const campaign = state.campaign;
-  const intro =
+  const isHospitality =
     campaign.niche.toLowerCase().includes("hotel") ||
-    campaign.niche.toLowerCase().includes("pousada")
-      ? `Estou organizando uma viagem curta para ${campaign.location} com minha namorada e encontrei ${lead.name}.`
-      : `Estou analisando empresas do nicho de ${campaign.niche} em ${campaign.location} e encontrei ${lead.name}.`;
+    campaign.niche.toLowerCase().includes("pousada");
+  const intro = isHospitality
+    ? `Estou organizando uma viagem curta para ${campaign.location} com minha namorada e encontrei ${lead.name}.`
+    : `Estou analisando empresas do nicho de ${campaign.niche} em ${campaign.location} e encontrei ${lead.name}.`;
 
   const contextLines = [
     lead.instagram ? `Vi tambem o Instagram: ${lead.instagram}.` : "",
@@ -185,6 +399,7 @@ function buildMessage(lead) {
 
 function collectCampaignForm() {
   return {
+    ...state.campaign,
     name: elements.campaignName.value.trim(),
     niche: elements.niche.value.trim(),
     location: elements.location.value.trim(),
@@ -196,7 +411,7 @@ function collectCampaignForm() {
   };
 }
 
-function updateLeadStatus(status) {
+async function updateLeadStatus(status) {
   const lead = getSelectedLead();
   if (!lead) return;
 
@@ -204,6 +419,13 @@ function updateLeadStatus(status) {
   lead.updatedAt = new Date().toISOString();
   saveState();
   renderLeads();
+
+  try {
+    await updateLeadStatusInDatabase(lead);
+  } catch (error) {
+    updateStorageStatus("Erro ao salvar status");
+    console.error(error);
+  }
 }
 
 function normalizeWhatsapp(value) {
@@ -227,18 +449,53 @@ async function copyText(value) {
   textarea.remove();
 }
 
-elements.campaignForm.addEventListener("submit", (event) => {
+elements.databaseForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  dbConfig = {
+    supabaseUrl: elements.supabaseUrl.value.trim().replace(/\/$/, ""),
+    supabaseAnonKey: elements.supabaseAnonKey.value.trim(),
+  };
+  saveDbConfig();
+  updateStorageStatus("Conectando...");
+
+  try {
+    await loadFromDatabase();
+  } catch (error) {
+    updateStorageStatus("Erro no banco");
+    console.error(error);
+  }
+});
+
+elements.loadDatabase.addEventListener("click", async () => {
+  try {
+    await loadFromDatabase();
+  } catch (error) {
+    updateStorageStatus("Erro ao carregar");
+    console.error(error);
+  }
+});
+
+elements.campaignForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   state.campaign = collectCampaignForm();
   saveState();
   renderSelectedLead();
+
+  try {
+    await saveCampaignToDatabase();
+    updateStorageStatus();
+  } catch (error) {
+    updateStorageStatus("Erro ao salvar campanha");
+    console.error(error);
+  }
 });
 
-elements.leadForm.addEventListener("submit", (event) => {
+elements.leadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const lead = {
     id: crypto.randomUUID(),
+    campaignId: state.campaign.id,
     name: elements.leadName.value.trim(),
     category: elements.leadCategory.value.trim(),
     area: elements.leadArea.value.trim(),
@@ -257,6 +514,19 @@ elements.leadForm.addEventListener("submit", (event) => {
   saveState();
   elements.leadForm.reset();
   renderLeads();
+
+  try {
+    const savedLead = await saveLeadToDatabase(lead);
+    const index = state.leads.findIndex((item) => item.id === lead.id);
+    state.leads[index] = savedLead;
+    state.selectedLeadId = savedLead.id;
+    saveState();
+    renderLeads();
+    updateStorageStatus();
+  } catch (error) {
+    updateStorageStatus("Lead salvo local");
+    console.error(error);
+  }
 });
 
 elements.leadStatus.addEventListener("change", () => {
@@ -317,11 +587,19 @@ elements.importData.addEventListener("change", async (event) => {
 
   const content = await file.text();
   const importedState = JSON.parse(content);
-  state = { ...initialState, ...importedState };
+  state = { ...structuredClone(initialState), ...importedState };
   saveState();
   fillCampaignForm();
   renderLeads();
 });
 
+fillDatabaseForm();
 fillCampaignForm();
 renderLeads();
+
+if (isDatabaseConfigured()) {
+  loadFromDatabase().catch((error) => {
+    updateStorageStatus("Modo local");
+    console.error(error);
+  });
+}

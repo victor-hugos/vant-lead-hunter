@@ -152,9 +152,30 @@ button.primary {
 
 .topbar-actions,
 .actions {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.storage-status {
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 12px;
+}
+
+.storage-status.online {
+  background: #e7f4ed;
+  border-color: #b7dec8;
+  color: var(--ok);
+}
+
+.compact-panel {
+  padding-bottom: 16px;
 }
 
 .file-button input {

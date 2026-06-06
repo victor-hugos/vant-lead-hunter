@@ -18,3 +18,16 @@ O sistema salva os dados no `localStorage` do navegador e permite exportar/impor
 ## Deploy
 
 Projeto estatico. Pode ser publicado diretamente na Vercel sem build command.
+
+## Supabase
+
+1. Abra o SQL Editor do Supabase.
+2. Execute `docs/supabase.sql`.
+3. No app, preencha:
+   - Supabase URL
+   - Supabase anon key
+4. Clique em `Conectar banco`.
+
+Enquanto o banco nao estiver configurado, o app usa `localStorage` como fallback.
+
+Observacao: as policies do MVP permitem leitura e escrita com a anon key. Isso e pratico para validar hoje, mas deve ser endurecido com login antes de uso publico pesado.
